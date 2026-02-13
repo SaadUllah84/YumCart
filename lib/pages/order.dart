@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot;
 import 'package:flutter/material.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:food_delivery/services/database.dart';
 import 'package:food_delivery/services/shared_pref.dart';
 import '../widget/widget_support.dart' show AppWidget;
@@ -55,15 +53,29 @@ class _OrderState extends State<Order> {
     return StreamBuilder(
         stream: foodStream,
         builder: (context, AsyncSnapshot snapshot) {
-          return snapshot.hasData ?
-          ListView.builder(
+          if (snapshot.hasData) {
+            int currentTotal = 0;
+            for (var doc in snapshot.data.docs) {
+              currentTotal += int.parse(doc["Total"]);
+            }
+            if (currentTotal != total) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() {
+                    total = currentTotal;
+                    amount2 = currentTotal;
+                  });
+                }
+              });
+            }
+
+            return ListView.builder(
               padding: EdgeInsets.zero,
               itemCount: snapshot.data.docs.length,
               shrinkWrap: true,
               scrollDirection: Axis.vertical,
               itemBuilder: (context, index) {
                 DocumentSnapshot ds = snapshot.data.docs[index];
-                total = total+ int.parse(ds["Total"]);
                 return Container(
                   margin: EdgeInsets.only(left: 20, right: 20,bottom: 10),
                   child: Material(
@@ -104,8 +116,9 @@ class _OrderState extends State<Order> {
                     ),
                   ),
                 );
-              })
-              : CircularProgressIndicator();
+              });
+          }
+          return CircularProgressIndicator();
         });
   }
   @override
@@ -144,7 +157,7 @@ class _OrderState extends State<Order> {
             GestureDetector(
               onTap: () async {
                 int amount = int.parse(wallet!) - amount2;
-                await DatabaseMethods().UpdateUserWallet(id!, amount.toString());
+                await DatabaseMethods().updateUserWallet(id!, amount.toString());
                 await SharedPreferenceHelper().saveUserWallet(amount.toString());
 
                 // Clear the food cart after checkout
