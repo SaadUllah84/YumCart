@@ -1,12 +1,9 @@
-import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:food_delivery/services/database.dart';
+import 'package:food_delivery/services/payment_service.dart';
 import 'package:food_delivery/services/shared_pref.dart';
-import 'package:food_delivery/widget/app_constant.dart';
 import 'package:food_delivery/widget/widget_support.dart';
-import 'package:http/http.dart'as http;
 
 class Wallet extends StatefulWidget {
   const Wallet({super.key});
@@ -40,8 +37,6 @@ class _WalletState extends State<Wallet> {
     super.initState();
   }
 
-
-  Map<String, dynamic> ? paymentIntent;
 
   @override
   Widget build(BuildContext context) {
@@ -188,84 +183,37 @@ class _WalletState extends State<Wallet> {
   }
 
   Future<void> makePayment(String amount) async {
-    try {
-      paymentIntent = await createPaymentIntent(amount, 'AED');
-      await Stripe.instance.initPaymentSheet(
-          paymentSheetParameters: SetupPaymentSheetParameters(
-              paymentIntentClientSecret: paymentIntent!['client_secret'],
-              style: ThemeMode.dark,
-              merchantDisplayName: 'SaadUllah'
-          )).then((onValue) {});
-      displayPaymentSheet(amount);
-    } catch (e, s) {
-      print('exception: $e$s');
+    bool success = await PaymentService().makePayment(amount);
+    if (success) {
+      add = int.parse(wallet!) + int.parse(amount);
+      await SharedPreferenceHelper().saveUserWallet(add.toString());
+      await DatabaseMethods().updateUserWallet(id!, add.toString());
+      showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                        ),
+                        Text("Payment Successful")
+                      ],
+                    )
+                  ],
+                ),
+              ));
+      await gettheSharedpref();
+    } else {
+      showDialog(
+          context: context,
+          builder: (_) => const AlertDialog(
+                content: Text("Payment Cancelled or Failed"),
+              ));
     }
-  }
-
-  displayPaymentSheet(String amount) async {
-    try {
-      await Stripe.instance.presentPaymentSheet().then((onValue) async {
-        add = int.parse(wallet!)+int.parse(amount);
-        await SharedPreferenceHelper().saveUserWallet(add.toString());
-        await DatabaseMethods().UpdateUserWallet(id!,add.toString() );
-        showDialog(context: context, builder: (_) =>
-            AlertDialog(
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                Row(children: [
-                  Icon(Icons.check_circle, color: Colors.green,),
-                  Text("Payment Successful")
-                ],)
-              ],),
-            ));
-
-        await gettheSharedpref();
-        paymentIntent = null;
-      }).onError((error, stackTrace) {
-        print("Error is: ---> $error $stackTrace");
-      });
-    } on StripeException catch (e) {
-      print("Error is: ---> $e");
-      showDialog(context: context, builder: (_) =>
-      const AlertDialog(
-        content: Text("Cancelled "),
-      ));
-    } catch (e) {
-      print("$e");
-    }
-  }
-
-  createPaymentIntent(String amount, String currency) async {
-    try {
-      Map<String, dynamic> body = {
-        'amount': calculateAmount(amount),
-        'currency': currency,
-        'payment_method_types[]': 'card',
-      };
-
-      var response = await http.post(
-        Uri.parse('https://api.stripe.com/v1/payment_intents'),
-        headers: {
-          'Authorization': 'Bearer $secretKey',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: body,
-      );
-      print("Payment Intent Body => ${response.body}");
-      return jsonDecode(response.body);
-    }
-    catch (err) {
-      print('Error creating payment intent: $err');
-    }
-  }
-  String calculateAmount(String amount) {
-    final parsedAmount = int.tryParse(amount);
-
-    if (parsedAmount == null || parsedAmount <= 0) {
-      throw Exception("Invalid amount");
-    }
-    return (parsedAmount * 100).toString();
   }
 
 Future<void> openEdit() {

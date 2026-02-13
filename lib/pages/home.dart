@@ -18,6 +18,8 @@ class _HomeState extends State<Home> {
       burger = false;
 
   Stream? fooditemStream;
+  TextEditingController searchController = TextEditingController();
+  bool search = false;
 
   ontheload() async {
     fooditemStream = await DatabaseMethods().getFoodItem("Pizza");
@@ -32,17 +34,31 @@ class _HomeState extends State<Home> {
     super.initState();
   }
 
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   Widget allItemsVertically() {
     return StreamBuilder(
         stream: fooditemStream,
         builder: (context, AsyncSnapshot snapshot) {
-          return snapshot.hasData ? ListView.builder(
+          if (snapshot.hasData) {
+            List docs = snapshot.data.docs;
+            if (search) {
+              docs = docs.where((element) => element["Name"]
+                  .toString()
+                  .toLowerCase()
+                  .contains(searchController.text.toLowerCase())).toList();
+            }
+            return ListView.builder(
               padding: EdgeInsets.zero,
-              itemCount: snapshot.data.docs.length,
+              itemCount: docs.length,
               shrinkWrap: true,
               scrollDirection: Axis.vertical,
               itemBuilder: (context, index) {
-                DocumentSnapshot ds = snapshot.data.docs[index];
+                DocumentSnapshot ds = docs[index];
                 return GestureDetector(
                   onTap: () {
                     Navigator.push(context,
@@ -97,7 +113,9 @@ class _HomeState extends State<Home> {
                     ),
                   ),
                 );
-              }) : CircularProgressIndicator();
+              });
+          }
+          return CircularProgressIndicator();
         });
   }
 
@@ -105,13 +123,21 @@ class _HomeState extends State<Home> {
     return StreamBuilder(
         stream: fooditemStream,
         builder: (context, AsyncSnapshot snapshot) {
-          return snapshot.hasData ? ListView.builder(
+          if (snapshot.hasData) {
+            List docs = snapshot.data.docs;
+            if (search) {
+              docs = docs.where((element) => element["Name"]
+                  .toString()
+                  .toLowerCase()
+                  .contains(searchController.text.toLowerCase())).toList();
+            }
+            return ListView.builder(
               padding: EdgeInsets.zero,
-              itemCount: snapshot.data.docs.length,
+              itemCount: docs.length,
               shrinkWrap: true,
               scrollDirection: Axis.horizontal,
               itemBuilder: (context, index) {
-                DocumentSnapshot ds = snapshot.data.docs[index];
+                DocumentSnapshot ds = docs[index];
                 return GestureDetector(
                   onTap: () {
                     Navigator.push(context,
@@ -174,7 +200,9 @@ class _HomeState extends State<Home> {
                     ),
                   ),
                 );
-              }) : CircularProgressIndicator();
+              });
+          }
+          return CircularProgressIndicator();
         });
   }
 
@@ -193,19 +221,27 @@ class _HomeState extends State<Home> {
                     Text("Hello Foodie,",
                         style: AppWidget.boldTextFieldStyle()
                     ),
-                    // Container(
-                    //   margin: EdgeInsets.only(right: 20.0),
-                    //   padding: EdgeInsets.all(3),
-                    //   decoration: BoxDecoration(
-                    //     color: Colors.black,
-                    //     borderRadius: BorderRadius.circular(8),
-                    //   ),
-                    //   // child: Icon(
-                    //   //   Icons.shopping_cart_outlined,
-                    //   //   color: Colors.white,
-                    //   // ),
-                    // )
                   ],
+                ),
+                SizedBox(height: 20,),
+                Container(
+                  margin: EdgeInsets.only(right: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                      color: Color(0xFFececf8),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        search = value.isNotEmpty;
+                      });
+                    },
+                    decoration: InputDecoration(
+                        border: InputBorder.none,
+                        suffixIcon: Icon(Icons.search),
+                        hintText: "Search Food"),
+                  ),
                 ),
                 SizedBox(height: 30,),
                 Text("Delcious Food",
